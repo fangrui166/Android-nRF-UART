@@ -26,6 +26,10 @@ package com.nordicsemi.nrfUARTv2;
 
 
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.text.DateFormat;
 import java.util.ArrayList;
@@ -55,11 +59,13 @@ import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.support.v4.content.LocalBroadcastManager;
 import android.text.InputType;
+import android.text.format.Time;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.Menu;
@@ -170,7 +176,7 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
 				try {
 					//send data to service
 					value = strAddPostfix(message).getBytes("UTF-8");
-
+                    textViewReciver.append(message+"\r\n");
                     value_length = value.length;
                     if (value_length > 200)
                         value_length = 200;
@@ -270,7 +276,9 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
         switch (v.getId()) {
             case R.id.traceroute_rootview:
                 InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
-                imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
+                if(imm.isActive()) {
+                    imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
+                }
                 break;
         }
 
@@ -297,6 +305,26 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
                     }
                     break;
                 case R.id.buttonSave:
+                    if(textViewReciver.getText().toString().equals("")) break;
+
+                    String currentDateTimeString = DateFormat.getTimeInstance().format(new Time());
+                    String fileName= currentDateTimeString+"_log";
+                    String content = textViewReciver.getText().toString();
+                    save2File(fileName,content);
+                    /*
+                    String filePath = Environment.getExternalStorageDirectory() + File.separator + fileName;
+                    Uri fileUri = Uri.fromFile(new File(filePath));
+
+                    //Intent intent=new Intent(Intent.ACTION_SEND);
+                    Intent intent=new Intent(Intent.ACTION_SEND_MULTIPLE);
+                    //intent.setType("text/plain");
+                    intent.setType("text/plain");
+                    intent.putExtra(Intent.EXTRA_SUBJECT, currentDateTimeString+"_log");
+                    intent.putExtra(Intent.EXTRA_TEXT, content);
+                    intent.putExtra(Intent.EXTRA_STREAM, fileUri);
+                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(Intent.createChooser(intent, getTitle()));
+                    */
                     break;
                 case R.id.buttonSendClear:
                     edtMessage.setText("");
@@ -307,7 +335,35 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
         }
 
     }
+    private void save2File(String fileName, String content) {
 
+        try {
+      /* 根据用户提供的文件名，以及文件的应用模式，打开一个输出流.文件不存系统会为你创建一个的，
+       * 至于为什么这个地方还有FileNotFoundException抛出，我也比较纳闷。在Context中是这样定义的
+       *  public abstract FileOutputStream openFileOutput(String name, int mode)
+       *  throws FileNotFoundException;
+       * openFileOutput(String name, int mode);
+       * 第一个参数，代表文件名称，注意这里的文件名称不能包括任何的/或者/这种分隔符，只能是文件名
+       *     该文件会被保存在/data/data/应用名称/files/fileName
+       * 第二个参数，代表文件的操作模式
+       *     MODE_PRIVATE 私有（只能创建它的应用访问） 重复写入时会文件覆盖
+       *     MODE_APPEND 私有  重复写入时会在文件的末尾进行追加，而不是覆盖掉原来的文件
+       *     MODE_WORLD_READABLE 公用 可读
+       *     MODE_WORLD_WRITEABLE 公用 可读写
+       * */
+            FileOutputStream outputStream = openFileOutput(fileName,
+                    Activity.MODE_PRIVATE);
+            outputStream.write(content.getBytes());
+            outputStream.flush();
+            outputStream.close();
+            showMessage( "保存成功");
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
     //UART service connected/disconnected
     private ServiceConnection mServiceConnection = new ServiceConnection() {
         public void onServiceConnected(ComponentName className, IBinder rawBinder) {
