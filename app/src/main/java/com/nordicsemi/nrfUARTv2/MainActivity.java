@@ -29,6 +29,7 @@ package com.nordicsemi.nrfUARTv2;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.text.DateFormat;
@@ -66,12 +67,14 @@ import android.os.Message;
 import android.support.v4.content.LocalBroadcastManager;
 import android.text.InputType;
 import android.text.format.Time;
+import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -106,6 +109,7 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
     private UartService mService = null;
     private BluetoothDevice mDevice = null;
     private BluetoothAdapter mBtAdapter = null;
+    private LinearLayout rootLayout;
     private TextView textViewReciver;
 
     private Button btnSend, btnRxClear, btnStop, btnSave, btnSendClear ;
@@ -124,8 +128,11 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
             finish();
             return;
         }
-        findViewById(R.id.traceroute_rootview).setOnClickListener(this);
+        rootLayout = (LinearLayout)findViewById(R.id.traceroute_rootview);
+        rootLayout.setOnClickListener(this);
+        rootLayout.setClickable(false);
         textViewReciver = (TextView) findViewById(R.id.textReceive);
+        textViewReciver.setMovementMethod(ScrollingMovementMethod.getInstance());
         btnSend=(Button) findViewById(R.id.buttonSend);
         //btnSend.setEnabled(false);
         btnRxClear=(Button) findViewById(R.id.buttonRxClear);
@@ -137,6 +144,7 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
         btnSendClear=(Button) findViewById(R.id.buttonSendClear);
         btnSendClear.setOnClickListener(new buttonListener());
         edtMessage = (EditText) findViewById(R.id.editTextSend);
+        edtMessage.setOnFocusChangeListener(new edtFocusChangeListener());
         edtMessage.setText("log bledump");
         spSendRecord=(Spinner)findViewById(R.id.spinnerSendRecord);
         listSendRecord = new ArrayList<String>();
@@ -152,13 +160,14 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
             public void onItemSelected(AdapterView<?> arg0, View arg1,
                                        int arg2, long arg3)
             {
+                Log.i(TAG,"onItemSelected:"+arg0 + arg1 + arg2 + arg3);
                 edtMessage.setText("");
                 edtMessage.setText(arg0.getSelectedItem().toString());
             }
 
             public void onNothingSelected(AdapterView<?> arg0)
             {
-
+                Log.e(TAG, "onNothingSelected");
             }
         });
         // Handle Send button
@@ -277,13 +286,27 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
             case R.id.traceroute_rootview:
                 InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
                 if(imm.isActive()) {
+                    Log.i(TAG, "imm.isActive");
                     imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
+                    rootLayout.setClickable(false);
                 }
+
                 break;
+
         }
 
     }
+    public class edtFocusChangeListener implements View.OnFocusChangeListener{
 
+        public void onFocusChange(View var1, boolean var2){
+            switch (var1.getId()){
+                case R.id.editTextSend:
+                    rootLayout.setClickable(true);
+                    break;
+            }
+
+        }
+    }
     public class buttonListener implements View.OnClickListener {
 
         @Override
@@ -307,24 +330,28 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
                 case R.id.buttonSave:
                     if(textViewReciver.getText().toString().equals("")) break;
 
-                    String currentDateTimeString = DateFormat.getTimeInstance().format(new Time());
-                    String fileName= currentDateTimeString+"_log";
-                    String content = textViewReciver.getText().toString();
-                    save2File(fileName,content);
-                    /*
+                    String currentDateTimeString = DateFormat.getTimeInstance().format(new Date());
+                    //String fileName= currentDateTimeString+"_log";
+                   // Log.e(TAG, fileName);
+                    String fileName= "log.txt";
                     String filePath = Environment.getExternalStorageDirectory() + File.separator + fileName;
+                    String content = textViewReciver.getText().toString();
+                    save2File(filePath,content);
+
+
+                    Log.e(TAG, filePath);
                     Uri fileUri = Uri.fromFile(new File(filePath));
 
                     //Intent intent=new Intent(Intent.ACTION_SEND);
-                    Intent intent=new Intent(Intent.ACTION_SEND_MULTIPLE);
+                    Intent intent=new Intent(Intent.ACTION_SEND);
                     //intent.setType("text/plain");
-                    intent.setType("text/plain");
+                    intent.setType("*/*");
                     intent.putExtra(Intent.EXTRA_SUBJECT, currentDateTimeString+"_log");
                     intent.putExtra(Intent.EXTRA_TEXT, content);
                     intent.putExtra(Intent.EXTRA_STREAM, fileUri);
                     intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    startActivity(Intent.createChooser(intent, getTitle()));
-                    */
+                    startActivity(Intent.createChooser(intent, "Share Log"));
+
                     break;
                 case R.id.buttonSendClear:
                     edtMessage.setText("");
@@ -335,30 +362,17 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
         }
 
     }
-    private void save2File(String fileName, String content) {
+    private void save2File(String filePath, String content) {
 
         try {
-      /* 根据用户提供的文件名，以及文件的应用模式，打开一个输出流.文件不存系统会为你创建一个的，
-       * 至于为什么这个地方还有FileNotFoundException抛出，我也比较纳闷。在Context中是这样定义的
-       *  public abstract FileOutputStream openFileOutput(String name, int mode)
-       *  throws FileNotFoundException;
-       * openFileOutput(String name, int mode);
-       * 第一个参数，代表文件名称，注意这里的文件名称不能包括任何的/或者/这种分隔符，只能是文件名
-       *     该文件会被保存在/data/data/应用名称/files/fileName
-       * 第二个参数，代表文件的操作模式
-       *     MODE_PRIVATE 私有（只能创建它的应用访问） 重复写入时会文件覆盖
-       *     MODE_APPEND 私有  重复写入时会在文件的末尾进行追加，而不是覆盖掉原来的文件
-       *     MODE_WORLD_READABLE 公用 可读
-       *     MODE_WORLD_WRITEABLE 公用 可读写
-       * */
-            FileOutputStream outputStream = openFileOutput(fileName,
-                    Activity.MODE_PRIVATE);
-            outputStream.write(content.getBytes());
-            outputStream.flush();
-            outputStream.close();
-            showMessage( "保存成功");
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
+            File logFile = new File(filePath);
+            if(!logFile.exists()){
+                logFile.createNewFile();
+            }
+            FileWriter fWriter = new FileWriter(logFile);
+            fWriter.write(content);
+            fWriter.close();
+            Log.e(TAG, "save success");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -406,7 +420,8 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
                          mMenuTtemConnect.setTitle("Disconnect");
                          edtMessage.setEnabled(true);
                          btnSend.setEnabled(true);
-                         showMessage(mDevice.getName()+ " - ready");
+                         setTitle(mDevice.getName() +" - Ready");
+                         //showMessage(mDevice.getName()+ " - ready");
                          mState = UART_PROFILE_CONNECTED;
                      }
             	 });
@@ -421,7 +436,8 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
                          mMenuTtemConnect.setTitle("Connect");
                          edtMessage.setEnabled(false);
                          btnSend.setEnabled(false);
-                         showMessage("Disconnected to: "+ mDevice.getName());
+                         setTitle(getPackageName().toString());
+                         //showMessage("Disconnected to: "+ mDevice.getName());
                          mState = UART_PROFILE_DISCONNECTED;
                          mService.close();
                         //setUiState();
