@@ -8,14 +8,15 @@
         android:id="@+id/traceroute_rootview"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:clickable="true"
         android:orientation="vertical" >
 
             <RelativeLayout
                 android:orientation="vertical"
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
+                android:id="@+id/textReceiveRelativeLayout"
                 android:background="@drawable/corners_bg"
+                android:layout_alignParentBottom="true"
                 android:layout_weight="3">
                 <ScrollView
                     android:layout_width="match_parent"
@@ -28,12 +29,6 @@
                         android:layout_height="match_parent"
                         android:text=""
                         android:id="@+id/textReceive"
-                        android:layout_alignParentLeft="true"
-                        android:layout_marginLeft="0dp"
-                        android:layout_alignParentTop="true"
-                        android:layout_marginTop="0dp"
-                        android:scrollbars="vertical"
-                        android:fadeScrollbars="false"
                         />
                 </ScrollView>
             </RelativeLayout>
@@ -105,6 +100,7 @@
                 android:orientation="vertical"
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
+                android:layout_alignParentBottom="true"
                 android:layout_weight="1">
 
                 <LinearLayout
@@ -209,5 +205,4 @@
             </RelativeLayout>
 
     </LinearLayout>
-
 </LinearLayout>

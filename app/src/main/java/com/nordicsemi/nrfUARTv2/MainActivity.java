@@ -27,11 +27,8 @@ package com.nordicsemi.nrfUARTv2;
 
 
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -39,13 +36,15 @@ import java.util.Date;
 import java.util.List;
 
 
-import com.nordicsemi.nrfUARTv2.UartService;
+import com.google.android.gms.appindexing.Action;
+import com.google.android.gms.appindexing.AppIndex;
+import com.google.android.gms.appindexing.Thing;
+import com.google.android.gms.common.api.GoogleApiClient;
 
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothManager;
 
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -56,8 +55,6 @@ import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
-import android.media.Ringtone;
-import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
@@ -65,29 +62,24 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.support.v4.content.LocalBroadcastManager;
-import android.text.InputType;
-import android.text.format.Time;
-import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.Menu;
-import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
-import android.widget.ListView;
-import android.widget.RadioGroup;
+import android.widget.RelativeLayout;
+import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
-public class MainActivity extends Activity implements RadioGroup.OnCheckedChangeListener, View.OnClickListener {
+public class MainActivity extends Activity implements View.OnClickListener {
     private static final int REQUEST_SELECT_DEVICE = 1;
     private static final int REQUEST_ENABLE_BT = 2;
     private static final int UART_PROFILE_READY = 10;
@@ -102,22 +94,29 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
     private static byte[] rx = new byte[256];
     private static boolean rx_received = false;
 
-    TextView mRemoteRssiVal;
-    RadioGroup mRg;
+
     private int mState = UART_PROFILE_DISCONNECTED;
-    private int mRxStopFlag=0;
+    private int mRxStopFlag = 0;
     private UartService mService = null;
     private BluetoothDevice mDevice = null;
     private BluetoothAdapter mBtAdapter = null;
-    private LinearLayout rootLayout;
+    private LinearLayout mtraceroute_rootview;
+    private RelativeLayout mtextReceiveRelativeLayout;
+    private ScrollView scrollViewRecviver;
     private TextView textViewReciver;
 
-    private Button btnSend, btnRxClear, btnStop, btnSave, btnSendClear ;
+    private Button btnSend, btnRxClear, btnStop, btnSave, btnSendClear;
     private EditText edtMessage;
     private Spinner spSendRecord;
-    private List<String> listSendRecord ;
+    private List<String> listSendRecord;
     private ArrayAdapter<String> adapterSendRecord;
     private MenuItem mMenuTtemConnect;
+    /**
+     * ATTENTION: This was auto-generated to implement the App Indexing API.
+     * See https://g.co/AppIndexing/AndroidStudio for more information.
+     */
+    private GoogleApiClient client;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -128,45 +127,45 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
             finish();
             return;
         }
-        rootLayout = (LinearLayout)findViewById(R.id.traceroute_rootview);
-        rootLayout.setOnClickListener(this);
-        rootLayout.setClickable(false);
+        mtraceroute_rootview = (LinearLayout) findViewById(R.id.traceroute_rootview);
+        mtraceroute_rootview.setOnClickListener(this);
+        mtextReceiveRelativeLayout = (RelativeLayout) findViewById(R.id.textReceiveRelativeLayout);
+        mtextReceiveRelativeLayout.setOnClickListener(this);
+        scrollViewRecviver = (ScrollView) findViewById(R.id.textReceiveScroll);
+        scrollViewRecviver.setOnClickListener(this);
         textViewReciver = (TextView) findViewById(R.id.textReceive);
-        textViewReciver.setMovementMethod(ScrollingMovementMethod.getInstance());
-        btnSend=(Button) findViewById(R.id.buttonSend);
-        //btnSend.setEnabled(false);
-        btnRxClear=(Button) findViewById(R.id.buttonRxClear);
+        textViewReciver.setOnClickListener(this);
+        //textViewReciver.setMovementMethod(ScrollingMovementMethod.getInstance());
+        btnSend = (Button) findViewById(R.id.buttonSend);
+        btnRxClear = (Button) findViewById(R.id.buttonRxClear);
         btnRxClear.setOnClickListener(new buttonListener());
-        btnStop=(Button) findViewById(R.id.buttonStop);
+        btnStop = (Button) findViewById(R.id.buttonStop);
         btnStop.setOnClickListener(new buttonListener());
-        btnSave=(Button) findViewById(R.id.buttonSave);
+        btnSave = (Button) findViewById(R.id.buttonSave);
         btnSave.setOnClickListener(new buttonListener());
-        btnSendClear=(Button) findViewById(R.id.buttonSendClear);
+        btnSendClear = (Button) findViewById(R.id.buttonSendClear);
         btnSendClear.setOnClickListener(new buttonListener());
         edtMessage = (EditText) findViewById(R.id.editTextSend);
         edtMessage.setOnFocusChangeListener(new edtFocusChangeListener());
         edtMessage.setText("log bledump");
-        spSendRecord=(Spinner)findViewById(R.id.spinnerSendRecord);
+        spSendRecord = (Spinner) findViewById(R.id.spinnerSendRecord);
         listSendRecord = new ArrayList<String>();
-        adapterSendRecord = new ArrayAdapter<String>(this,R.layout.item, R.id.text,listSendRecord);
+        adapterSendRecord = new ArrayAdapter<String>(this, R.layout.item, R.id.text, listSendRecord);
         spSendRecord.setAdapter(adapterSendRecord);
         spSendRecord.setPrompt("history");
         service_init();
         recoverSendHistoryRecord();
 
-        spSendRecord.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener()
-        {
+        spSendRecord.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 
             public void onItemSelected(AdapterView<?> arg0, View arg1,
-                                       int arg2, long arg3)
-            {
-                Log.i(TAG,"onItemSelected:"+arg0 + arg1 + arg2 + arg3);
+                                       int arg2, long arg3) {
+                Log.i(TAG, "onItemSelected:" + arg0 + arg1 + arg2 + arg3);
                 edtMessage.setText("");
                 edtMessage.setText(arg0.getSelectedItem().toString());
             }
 
-            public void onNothingSelected(AdapterView<?> arg0)
-            {
+            public void onNothingSelected(AdapterView<?> arg0) {
                 Log.e(TAG, "onNothingSelected");
             }
         });
@@ -174,18 +173,19 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
         btnSend.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-            	EditText editText = (EditText) findViewById(R.id.editTextSend);
-            	String message = editText.getText().toString();
-            	byte[] value;
-                byte[] tx = new byte[18];;
+                EditText editText = (EditText) findViewById(R.id.editTextSend);
+                String message = editText.getText().toString();
+                byte[] value;
+                byte[] tx = new byte[18];
+                ;
                 int max_seq;
                 int value_length;
                 int tx_length;
                 SendRecordUpdate(message);
-				try {
-					//send data to service
-					value = strAddPostfix(message).getBytes("UTF-8");
-                    textViewReciver.append(message+"\r\n");
+                try {
+                    //send data to service
+                    value = strAddPostfix(message).getBytes("UTF-8");
+                    data2Display(message + "\r\n");
                     value_length = value.length;
                     if (value_length > 200)
                         value_length = 200;
@@ -193,16 +193,16 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
                     if (value_length > 0) {
                         max_seq = (value_length + 14) / 15; // < send 15bytes per packet
                         for (int i = 1; i <= max_seq; i++) {
-                            Arrays.fill(tx, (byte)0);
+                            Arrays.fill(tx, (byte) 0);
                             tx[0] = 0x3a;
                             tx[1] = tx_tick; //tick
-                            tx[2] = (byte)((max_seq << 4) | i);
+                            tx[2] = (byte) ((max_seq << 4) | i);
                             if (i != max_seq) {
-                                System.arraycopy(value, (i-1)*15, tx, 3, 15);
+                                System.arraycopy(value, (i - 1) * 15, tx, 3, 15);
                                 tx_length = 18;
                             } else {
-                                System.arraycopy(value, (i-1)*15, tx, 3, (value_length-(i-1)*15));
-                                tx_length = 3 + (value_length-(i-1)*15);
+                                System.arraycopy(value, (i - 1) * 15, tx, 3, (value_length - (i - 1) * 15));
+                                tx_length = 3 + (value_length - (i - 1) * 15);
                             }
 
                             //mService.writeRXCharacteristic(tx);
@@ -218,12 +218,12 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
                         //listAdapter.add("["+currentDateTimeString+"] TX: "+ message);
                     }
 
-               	 	//edtMessage.setText("");
-				//} catch (UnsupportedEncodingException e) {
+                    //edtMessage.setText("");
+                    //} catch (UnsupportedEncodingException e) {
                 } catch (Exception e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
 
             }
 
@@ -231,82 +231,117 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
         });
         // Set initial UI state
 
+        // ATTENTION: This was auto-generated to implement the App Indexing API.
+        // See https://g.co/AppIndexing/AndroidStudio for more information.
+        client = new GoogleApiClient.Builder(this).addApi(AppIndex.API).build();
     }
-    private void saveSendHistoryRecord(){
+
+
+    private void saveSendHistoryRecord() {
         int i;
         SharedPreferences mSharePreferences = getSharedPreferences(
                 "send_history_record", Activity.MODE_PRIVATE);
         SharedPreferences.Editor editor = mSharePreferences.edit();
 
-        for( i=0; i< adapterSendRecord.getCount(); i++ ){
-            editor.putString("item"+i,adapterSendRecord.getItem(i).toString());
+        for (i = 0; i < adapterSendRecord.getCount(); i++) {
+            editor.putString("item" + i, adapterSendRecord.getItem(i).toString());
         }
-        editor.putInt("count",i);
+        editor.putInt("count", i);
         editor.commit();
     }
-    private void recoverSendHistoryRecord(){
+
+    private void recoverSendHistoryRecord() {
         int count;
         SharedPreferences mySharePerferences = getSharedPreferences(
                 "send_history_record", Activity.MODE_PRIVATE);
         SharedPreferences.Editor editor = mySharePerferences.edit();
-        count = mySharePerferences.getInt("count",0);
-        for(int i=0; i< count; i++ ){
-            String value = mySharePerferences.getString("item"+i, "");
-            if(!value.equals("")){
+        count = mySharePerferences.getInt("count", 0);
+        for (int i = 0; i < count; i++) {
+            String value = mySharePerferences.getString("item" + i, "");
+            if (!value.equals("")) {
                 adapterSendRecord.add(value);
             }
         }
     }
-    private void SendRecordUpdate(String newItem){
-        for(int i=0; i< adapterSendRecord.getCount(); i++ ){
-            if(newItem.equals(adapterSendRecord.getItem(i))){
+
+    private void SendRecordUpdate(String newItem) {
+        for (int i = 0; i < adapterSendRecord.getCount(); i++) {
+            if (newItem.equals(adapterSendRecord.getItem(i))) {
                 return;
             }
         }
-        if(!newItem.equals("")){
+        if (!newItem.equals("")) {
             adapterSendRecord.add(newItem);
         }
-        if(adapterSendRecord.getCount() > 5 ){
+        if (adapterSendRecord.getCount() > 5) {
             spSendRecord.setSelection(0);
             adapterSendRecord.remove(spSendRecord.getSelectedItem().toString());
         }
 
     }
-    private String strAddPostfix(String str){
+
+    private String strAddPostfix(String str) {
         String postfix;
         postfix = str.substring(str.length());
-        if(!("\n".equals(postfix))){
-            return str+"\r\n";
+        if (!("\n".equals(postfix))) {
+            return str + "\r\n";
         }
         return str;
     }
+
     @Override
     public void onClick(View v) {
+        InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
         switch (v.getId()) {
-            case R.id.traceroute_rootview:
-                InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
-                if(imm.isActive()) {
-                    Log.i(TAG, "imm.isActive");
+            case R.id.textReceiveRelativeLayout:
+            case R.id.textReceiveScroll:
+            case R.id.textReceive:
+                Log.i(TAG, "textReceiveRelativeLayout");
+
+                if (imm.isActive()) {
+                    Log.e(TAG,"isActive:"+imm.isActive()+",isFullscreenMode:"+imm.isFullscreenMode()+",isAcceptingText:"+imm.isAcceptingText());
                     imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
-                    rootLayout.setClickable(false);
+                    //rootLayout.setClickable(false);
                 }
 
+                break;
+            case R.id.traceroute_rootview:
+                Log.e(TAG,"isActive:"+imm.isActive()+",isFullscreenMode:"+imm.isFullscreenMode()+",isAcceptingText:"+imm.isAcceptingText());
                 break;
 
         }
 
     }
-    public class edtFocusChangeListener implements View.OnFocusChangeListener{
 
-        public void onFocusChange(View var1, boolean var2){
-            switch (var1.getId()){
+    /**
+     * ATTENTION: This was auto-generated to implement the App Indexing API.
+     * See https://g.co/AppIndexing/AndroidStudio for more information.
+     */
+    public Action getIndexApiAction() {
+        Thing object = new Thing.Builder()
+                .setName("Main Page") // TODO: Define a title for the content shown.
+                // TODO: Make sure this auto-generated URL is correct.
+                .setUrl(Uri.parse("http://[ENTER-YOUR-URL-HERE]"))
+                .build();
+        return new Action.Builder(Action.TYPE_VIEW)
+                .setObject(object)
+                .setActionStatus(Action.STATUS_TYPE_COMPLETED)
+                .build();
+    }
+
+    public class edtFocusChangeListener implements View.OnFocusChangeListener {
+
+        public void onFocusChange(View var1, boolean var2) {
+            Log.e(TAG, "onFocusChange");
+            switch (var1.getId()) {
                 case R.id.editTextSend:
-                    rootLayout.setClickable(true);
+                    //rootLayout.setClickable(true);
                     break;
             }
 
         }
     }
+
     public class buttonListener implements View.OnClickListener {
 
         @Override
@@ -318,35 +353,34 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
                     break;
 
                 case R.id.buttonStop:
-                    if(mRxStopFlag == 1) {
+                    if (mRxStopFlag == 1) {
                         mRxStopFlag = 0;
                         btnStop.setText("Stop");
-                    }
-                    else{
+                    } else {
                         mRxStopFlag = 1;
                         btnStop.setText("Start");
                     }
                     break;
                 case R.id.buttonSave:
-                    if(textViewReciver.getText().toString().equals("")) break;
+                    if (textViewReciver.getText().toString().equals("")) break;
 
                     String currentDateTimeString = DateFormat.getTimeInstance().format(new Date());
                     //String fileName= currentDateTimeString+"_log";
-                   // Log.e(TAG, fileName);
-                    String fileName= "log.txt";
+                    // Log.e(TAG, fileName);
+                    String fileName = "log.txt";
                     String filePath = Environment.getExternalStorageDirectory() + File.separator + fileName;
                     String content = textViewReciver.getText().toString();
-                    save2File(filePath,content);
+                    save2File(filePath, content);
 
 
                     Log.e(TAG, filePath);
                     Uri fileUri = Uri.fromFile(new File(filePath));
 
                     //Intent intent=new Intent(Intent.ACTION_SEND);
-                    Intent intent=new Intent(Intent.ACTION_SEND);
+                    Intent intent = new Intent(Intent.ACTION_SEND);
                     //intent.setType("text/plain");
                     intent.setType("*/*");
-                    intent.putExtra(Intent.EXTRA_SUBJECT, currentDateTimeString+"_log");
+                    intent.putExtra(Intent.EXTRA_SUBJECT, currentDateTimeString + "_log");
                     intent.putExtra(Intent.EXTRA_TEXT, content);
                     intent.putExtra(Intent.EXTRA_STREAM, fileUri);
                     intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -362,11 +396,12 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
         }
 
     }
+
     private void save2File(String filePath, String content) {
 
         try {
             File logFile = new File(filePath);
-            if(!logFile.exists()){
+            if (!logFile.exists()) {
                 logFile.createNewFile();
             }
             FileWriter fWriter = new FileWriter(logFile);
@@ -378,21 +413,22 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
         }
 
     }
+
     //UART service connected/disconnected
     private ServiceConnection mServiceConnection = new ServiceConnection() {
         public void onServiceConnected(ComponentName className, IBinder rawBinder) {
-        		mService = ((UartService.LocalBinder) rawBinder).getService();
-        		Log.d(TAG, "onServiceConnected mService= " + mService);
-        		if (!mService.initialize()) {
-                    Log.e(TAG, "Unable to initialize Bluetooth");
-                    finish();
-                }
+            mService = ((UartService.LocalBinder) rawBinder).getService();
+            Log.d(TAG, "onServiceConnected mService= " + mService);
+            if (!mService.initialize()) {
+                Log.e(TAG, "Unable to initialize Bluetooth");
+                finish();
+            }
 
         }
 
         public void onServiceDisconnected(ComponentName classname) {
-       ////     mService.disconnect(mDevice);
-        		mService = null;
+            ////     mService.disconnect(mDevice);
+            mService = null;
         }
     };
 
@@ -411,47 +447,47 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
             String action = intent.getAction();
 
             final Intent mIntent = intent;
-           //*********************//
+            //*********************//
             if (action.equals(UartService.ACTION_GATT_CONNECTED)) {
-            	 runOnUiThread(new Runnable() {
-                     public void run() {
-                         String currentDateTimeString = DateFormat.getTimeInstance().format(new Date());
-                         Log.d(TAG, "UART_CONNECT_MSG");
-                         mMenuTtemConnect.setTitle("Disconnect");
-                         edtMessage.setEnabled(true);
-                         btnSend.setEnabled(true);
-                         setTitle(mDevice.getName() +" - Ready");
-                         //showMessage(mDevice.getName()+ " - ready");
-                         mState = UART_PROFILE_CONNECTED;
-                     }
-            	 });
+                runOnUiThread(new Runnable() {
+                    public void run() {
+                        String currentDateTimeString = DateFormat.getTimeInstance().format(new Date());
+                        Log.d(TAG, "UART_CONNECT_MSG");
+                        mMenuTtemConnect.setTitle("Disconnect");
+                        edtMessage.setEnabled(true);
+                        btnSend.setEnabled(true);
+                        setTitle(mDevice.getName() + " - Ready");
+                        //showMessage(mDevice.getName()+ " - ready");
+                        mState = UART_PROFILE_CONNECTED;
+                    }
+                });
             }
 
-          //*********************//
+            //*********************//
             if (action.equals(UartService.ACTION_GATT_DISCONNECTED)) {
-            	 runOnUiThread(new Runnable() {
-                     public void run() {
-                         String currentDateTimeString = DateFormat.getTimeInstance().format(new Date());
-                         Log.d(TAG, "UART_DISCONNECT_MSG");
-                         mMenuTtemConnect.setTitle("Connect");
-                         edtMessage.setEnabled(false);
-                         btnSend.setEnabled(false);
-                         setTitle(getPackageName().toString());
-                         //showMessage("Disconnected to: "+ mDevice.getName());
-                         mState = UART_PROFILE_DISCONNECTED;
-                         mService.close();
+                runOnUiThread(new Runnable() {
+                    public void run() {
+                        String currentDateTimeString = DateFormat.getTimeInstance().format(new Date());
+                        Log.d(TAG, "UART_DISCONNECT_MSG");
+                        mMenuTtemConnect.setTitle("Connect");
+                        edtMessage.setEnabled(false);
+                        btnSend.setEnabled(false);
+                        setTitle(getPackageName().toString());
+                        //showMessage("Disconnected to: "+ mDevice.getName());
+                        mState = UART_PROFILE_DISCONNECTED;
+                        mService.close();
                         //setUiState();
 
-                     }
-                 });
+                    }
+                });
             }
 
 
-          //*********************//
+            //*********************//
             if (action.equals(UartService.ACTION_GATT_SERVICES_DISCOVERED)) {
                 try {
                     Thread.sleep(500);// 40ms x 2
-                    byte imu_send_suspend_cmd[] = {0x41,0x30};
+                    byte imu_send_suspend_cmd[] = {0x41, 0x30};
                     mService.writeRXCharacteristic(imu_send_suspend_cmd);
                     Thread.sleep(500);// 40ms x 2
                 } catch (Exception e) {
@@ -459,18 +495,18 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
                 }
                 mService.enableTXNotification();
             }
-          //*********************//
+            //*********************//
             if (action.equals(UartService.ACTION_DATA_AVAILABLE)) {
-                 final byte[] value = intent.getByteArrayExtra(UartService.EXTRA_DATA);
-                 int last_rx_tick = rx_tick & 0xff;
-                 if (value.length > 5 && value[1] == 0x04) { //&& value[2]  <= 17 && value[2] + 3 == value.length && (value[4] & 0xf) > 0
-                     int cur_rx_tick = value[3] & 0xff;
-                     int max_seq = (value[4] >> 4) & 0x0f;
-                     int cur_seq = (value[4] & 0x0f);
-                     if (((cur_seq < max_seq) && value.length == 20) || (cur_seq == max_seq && value.length <= 20) ) {
+                final byte[] value = intent.getByteArrayExtra(UartService.EXTRA_DATA);
+                int last_rx_tick = rx_tick & 0xff;
+                if (value.length > 5 && value[1] == 0x04) { //&& value[2]  <= 17 && value[2] + 3 == value.length && (value[4] & 0xf) > 0
+                    int cur_rx_tick = value[3] & 0xff;
+                    int max_seq = (value[4] >> 4) & 0x0f;
+                    int cur_seq = (value[4] & 0x0f);
+                    if (((cur_seq < max_seq) && value.length == 20) || (cur_seq == max_seq && value.length <= 20)) {
                         if (cur_rx_tick >= last_rx_tick || cur_rx_tick == 0) {
                             if (cur_rx_tick > last_rx_tick || ((0 == cur_rx_tick) && (0 != last_rx_tick))) {
-                                Arrays.fill(rx, (byte)0);
+                                Arrays.fill(rx, (byte) 0);
                                 rx_pkt_num = 0;
                             }
                             System.arraycopy(value, 5, rx, (cur_seq - 1) * 15, value.length - 5);
@@ -482,51 +518,54 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
                             Log.i(TAG, "rx - Overdue pkt: cur_rx_tick(" + cur_rx_tick + ") < last_rx_tick(" + last_rx_tick + ")!");
                         }
 
-                     } else {
-                         Log.i(TAG, "rx - Packet format error: cur_seq > max_seq or length check fail!");
-                     }
-                 }
+                    } else {
+                        Log.i(TAG, "rx - Packet format error: cur_seq > max_seq or length check fail!");
+                    }
+                }
 
-                 runOnUiThread(new Runnable() {
-                     public void run() {
+                runOnUiThread(new Runnable() {
+                    public void run() {
 
-                         try {
-                             if (rx_received) {
-                                 String text = new String(rx, "UTF-8");
-                                 //String currentDateTimeString = DateFormat.getTimeInstance().format(new Date());
-                                 //listAdapter.add("["+currentDateTimeString+"] RX: "+text);
-                                 data2Display(text);
-                                 rx_received = false;
-                             }
-                         } catch (Exception e) {
-                             Log.e(TAG, e.toString());
-                         }
-                     }
-                 });
-             }
-           //*********************//
-            if (action.equals(UartService.DEVICE_DOES_NOT_SUPPORT_UART)){
-            	showMessage("Device doesn't support UART. Disconnecting");
-            	mService.disconnect();
+                        try {
+                            if (rx_received) {
+                                String text = new String(rx, "UTF-8");
+                                //String currentDateTimeString = DateFormat.getTimeInstance().format(new Date());
+                                //listAdapter.add("["+currentDateTimeString+"] RX: "+text);
+                                data2Display(text);
+                                rx_received = false;
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, e.toString());
+                        }
+                    }
+                });
+            }
+            //*********************//
+            if (action.equals(UartService.DEVICE_DOES_NOT_SUPPORT_UART)) {
+                showMessage("Device doesn't support UART. Disconnecting");
+                mService.disconnect();
             }
 
 
         }
     };
-    private void data2Display(String str)
-    {
-        if(mRxStopFlag == 0) {
+
+    private void data2Display(String str) {
+        if (mRxStopFlag == 0) {
             StringBuilder sMsg = new StringBuilder();
             sMsg.append(str);
             textViewReciver.append(sMsg);
+            scrollViewRecviver.fullScroll(ScrollView.FOCUS_DOWN);
         }
     }
+
     private void service_init() {
         Intent bindIntent = new Intent(this, UartService.class);
         bindService(bindIntent, mServiceConnection, Context.BIND_AUTO_CREATE);
 
         LocalBroadcastManager.getInstance(this).registerReceiver(UARTStatusChangeReceiver, makeGattUpdateIntentFilter());
     }
+
     private static IntentFilter makeGattUpdateIntentFilter() {
         final IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(UartService.ACTION_GATT_CONNECTED);
@@ -536,31 +575,42 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
         intentFilter.addAction(UartService.DEVICE_DOES_NOT_SUPPORT_UART);
         return intentFilter;
     }
+
     @Override
     public void onStart() {
-        super.onStart();
+        super.onStart();// ATTENTION: This was auto-generated to implement the App Indexing API.
+// See https://g.co/AppIndexing/AndroidStudio for more information.
+        client.connect();
+        // ATTENTION: This was auto-generated to implement the App Indexing API.
+        // See https://g.co/AppIndexing/AndroidStudio for more information.
+        AppIndex.AppIndexApi.start(client, getIndexApiAction());
     }
 
     @Override
     public void onDestroy() {
-    	 super.onDestroy();
+        super.onDestroy();
         Log.d(TAG, "onDestroy()");
 
         try {
-        	LocalBroadcastManager.getInstance(this).unregisterReceiver(UARTStatusChangeReceiver);
+            LocalBroadcastManager.getInstance(this).unregisterReceiver(UARTStatusChangeReceiver);
         } catch (Exception ignore) {
             Log.e(TAG, ignore.toString());
         }
         unbindService(mServiceConnection);
         mService.stopSelf();
-        mService= null;
+        mService = null;
 
     }
 
     @Override
     protected void onStop() {
         Log.d(TAG, "onStop");
-        super.onStop();
+        super.onStop();// ATTENTION: This was auto-generated to implement the App Indexing API.
+// See https://g.co/AppIndexing/AndroidStudio for more information.
+        AppIndex.AppIndexApi.end(client, getIndexApiAction());
+        // ATTENTION: This was auto-generated to implement the App Indexing API.
+        // See https://g.co/AppIndexing/AndroidStudio for more information.
+        client.disconnect();
     }
 
     @Override
@@ -596,42 +646,36 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         switch (requestCode) {
 
-        case REQUEST_SELECT_DEVICE:
-        	//When the DeviceListActivity return, with the selected device address
-            if (resultCode == Activity.RESULT_OK && data != null) {
-                String deviceAddress = data.getStringExtra(BluetoothDevice.EXTRA_DEVICE);
-                mDevice = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(deviceAddress);
+            case REQUEST_SELECT_DEVICE:
+                //When the DeviceListActivity return, with the selected device address
+                if (resultCode == Activity.RESULT_OK && data != null) {
+                    String deviceAddress = data.getStringExtra(BluetoothDevice.EXTRA_DEVICE);
+                    mDevice = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(deviceAddress);
 
-                Log.d(TAG, "... onActivityResultdevice.address==" + mDevice + "mserviceValue" + mService);
-                showMessage(mDevice.getName()+ " - connecting");
-                mService.connect(deviceAddress);
+                    Log.d(TAG, "... onActivityResultdevice.address==" + mDevice + "mserviceValue" + mService);
+                    showMessage(mDevice.getName() + " - connecting");
+                    mService.connect(deviceAddress);
 
 
-            }
-            break;
-        case REQUEST_ENABLE_BT:
-            // When the request to enable Bluetooth returns
-            if (resultCode == Activity.RESULT_OK) {
-                Toast.makeText(this, "Bluetooth has turned on ", Toast.LENGTH_SHORT).show();
+                }
+                break;
+            case REQUEST_ENABLE_BT:
+                // When the request to enable Bluetooth returns
+                if (resultCode == Activity.RESULT_OK) {
+                    Toast.makeText(this, "Bluetooth has turned on ", Toast.LENGTH_SHORT).show();
 
-            } else {
-                // User did not enable Bluetooth or an error occurred
-                Log.d(TAG, "BT not enabled");
-                Toast.makeText(this, "Problem in BT Turning ON ", Toast.LENGTH_SHORT).show();
-                finish();
-            }
-            break;
-        default:
-            Log.e(TAG, "wrong request code");
-            break;
+                } else {
+                    // User did not enable Bluetooth or an error occurred
+                    Log.d(TAG, "BT not enabled");
+                    Toast.makeText(this, "Problem in BT Turning ON ", Toast.LENGTH_SHORT).show();
+                    finish();
+                }
+                break;
+            default:
+                Log.e(TAG, "wrong request code");
+                break;
         }
     }
-
-    @Override
-    public void onCheckedChanged(RadioGroup group, int checkedId) {
-
-    }
-
 
     private void showMessage(String msg) {
         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
@@ -646,24 +690,23 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
             startMain.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(startMain);
             showMessage("nRFUART's running in background.\n             Disconnect to exit");
-        }
-        else {
+        } else {
             new AlertDialog.Builder(this)
-            .setIcon(android.R.drawable.ic_dialog_alert)
-            .setTitle(R.string.popup_title)
-            .setMessage(R.string.popup_message)
-            .setPositiveButton(R.string.popup_yes, new DialogInterface.OnClickListener()
-                {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        saveSendHistoryRecord();
-   	                finish();
-                }
-            })
-            .setNegativeButton(R.string.popup_no, null)
-            .show();
+                    .setIcon(android.R.drawable.ic_dialog_alert)
+                    .setTitle(R.string.popup_title)
+                    .setMessage(R.string.popup_message)
+                    .setPositiveButton(R.string.popup_yes, new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            saveSendHistoryRecord();
+                            finish();
+                        }
+                    })
+                    .setNegativeButton(R.string.popup_no, null)
+                    .show();
         }
     }
+
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case R.id.connect:
@@ -671,22 +714,20 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
                     Log.i(TAG, "onClick - BT not enabled yet");
                     Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
                     startActivityForResult(enableIntent, REQUEST_ENABLE_BT);
-                }
-                else {
-                	if ( item.getTitle().toString().equals("Connect")){
+                } else {
+                    if (item.getTitle().toString().equals("Connect")) {
 
-                		//Connect button pressed, open DeviceListActivity class, with popup windows that scan for devices
+                        //Connect button pressed, open DeviceListActivity class, with popup windows that scan for devices
 
-            			Intent newIntent = new Intent(MainActivity.this, DeviceListActivity.class);
-            			startActivityForResult(newIntent, REQUEST_SELECT_DEVICE);
-        			} else {
-        				//Disconnect button pressed
-        				if (mDevice!=null)
-        				{
-        					mService.disconnect();
+                        Intent newIntent = new Intent(MainActivity.this, DeviceListActivity.class);
+                        startActivityForResult(newIntent, REQUEST_SELECT_DEVICE);
+                    } else {
+                        //Disconnect button pressed
+                        if (mDevice != null) {
+                            mService.disconnect();
 
-        				}
-        			}
+                        }
+                    }
                 }
                 break;
             case R.id.about:
@@ -695,6 +736,7 @@ public class MainActivity extends Activity implements RadioGroup.OnCheckedChange
         }
         return true;
     }
+
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.main, menu);
         mMenuTtemConnect = menu.findItem(R.id.connect);
