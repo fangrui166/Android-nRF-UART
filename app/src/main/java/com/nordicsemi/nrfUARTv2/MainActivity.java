@@ -486,14 +486,15 @@ public class MainActivity extends Activity {
                     if (((cur_seq < max_seq) && value.length == 20) || (cur_seq == max_seq && value.length <= 20)) {
                         if (cur_rx_tick >= last_rx_tick || cur_rx_tick == 0) {
                             if (cur_rx_tick > last_rx_tick || ((0 == cur_rx_tick) && (0 != last_rx_tick))) {
-                                Arrays.fill(rx, (byte) 0);
+                                Arrays.fill(rx, (byte) '\0');
                                 rx_pkt_num = 0;
                             }
                             System.arraycopy(value, 5, rx, (cur_seq - 1) * 15, value.length - 5);
                             rx_tick = value[3];
                             rx_pkt_num++;
-                            if (rx_pkt_num == max_seq)
+                            if (rx_pkt_num == max_seq){
                                 rx_received = true;
+                            }
                         } else {
                             Log.i(TAG, "rx - Overdue pkt: cur_rx_tick(" + cur_rx_tick + ") < last_rx_tick(" + last_rx_tick + ")!");
                         }
@@ -508,7 +509,7 @@ public class MainActivity extends Activity {
 
                         try {
                             if (rx_received) {
-                                String text = new String(rx, "UTF-8");
+                                String text = new String(rx, "UTF-8").trim();
                                 //String currentDateTimeString = DateFormat.getTimeInstance().format(new Date());
                                 //listAdapter.add("["+currentDateTimeString+"] RX: "+text);
                                 data2Display(text);
