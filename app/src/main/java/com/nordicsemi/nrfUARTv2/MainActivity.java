@@ -35,12 +35,6 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
-
-import com.google.android.gms.appindexing.Action;
-import com.google.android.gms.appindexing.AppIndex;
-import com.google.android.gms.appindexing.Thing;
-import com.google.android.gms.common.api.GoogleApiClient;
-
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
@@ -66,6 +60,7 @@ import android.util.Log;
 import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
@@ -79,7 +74,7 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
-public class MainActivity extends Activity implements View.OnClickListener {
+public class MainActivity extends Activity {
     private static final int REQUEST_SELECT_DEVICE = 1;
     private static final int REQUEST_ENABLE_BT = 2;
     private static final int UART_PROFILE_READY = 10;
@@ -100,8 +95,6 @@ public class MainActivity extends Activity implements View.OnClickListener {
     private UartService mService = null;
     private BluetoothDevice mDevice = null;
     private BluetoothAdapter mBtAdapter = null;
-    private LinearLayout mtraceroute_rootview;
-    private RelativeLayout mtextReceiveRelativeLayout;
     private ScrollView scrollViewRecviver;
     private TextView textViewReciver;
 
@@ -111,11 +104,11 @@ public class MainActivity extends Activity implements View.OnClickListener {
     private List<String> listSendRecord;
     private ArrayAdapter<String> adapterSendRecord;
     private MenuItem mMenuTtemConnect;
+    private InputMethodManager  manager;
     /**
      * ATTENTION: This was auto-generated to implement the App Indexing API.
      * See https://g.co/AppIndexing/AndroidStudio for more information.
      */
-    private GoogleApiClient client;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -127,20 +120,15 @@ public class MainActivity extends Activity implements View.OnClickListener {
             finish();
             return;
         }
-        mtraceroute_rootview = (LinearLayout) findViewById(R.id.traceroute_rootview);
-        mtraceroute_rootview.setOnClickListener(this);
-        mtextReceiveRelativeLayout = (RelativeLayout) findViewById(R.id.textReceiveRelativeLayout);
-        mtextReceiveRelativeLayout.setOnClickListener(this);
         scrollViewRecviver = (ScrollView) findViewById(R.id.textReceiveScroll);
-        scrollViewRecviver.setOnClickListener(this);
         textViewReciver = (TextView) findViewById(R.id.textReceive);
-        textViewReciver.setOnClickListener(this);
-        //textViewReciver.setMovementMethod(ScrollingMovementMethod.getInstance());
         btnSend = (Button) findViewById(R.id.buttonSend);
+        btnSend.setEnabled(false);
         btnRxClear = (Button) findViewById(R.id.buttonRxClear);
         btnRxClear.setOnClickListener(new buttonListener());
         btnStop = (Button) findViewById(R.id.buttonStop);
         btnStop.setOnClickListener(new buttonListener());
+        btnStop.setTextColor(0xFF00FF00);
         btnSave = (Button) findViewById(R.id.buttonSave);
         btnSave.setOnClickListener(new buttonListener());
         btnSendClear = (Button) findViewById(R.id.buttonSendClear);
@@ -231,12 +219,42 @@ public class MainActivity extends Activity implements View.OnClickListener {
         });
         // Set initial UI state
 
-        // ATTENTION: This was auto-generated to implement the App Indexing API.
-        // See https://g.co/AppIndexing/AndroidStudio for more information.
-        client = new GoogleApiClient.Builder(this).addApi(AppIndex.API).build();
     }
 
-
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        if (ev.getAction() == MotionEvent.ACTION_DOWN) {
+            View v = getCurrentFocus();
+            if (isShouldHideInput(v, ev)) {
+                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (imm != null) {
+                    imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
+                }
+            }
+            return super.dispatchTouchEvent(ev);
+        }
+        if (getWindow().superDispatchTouchEvent(ev)) {
+            return true;
+        }
+        return onTouchEvent(ev);
+    }
+    public  boolean isShouldHideInput(View v, MotionEvent event) {
+        if (v != null && (v instanceof EditText)) {
+            int[] leftTop = { 0, 0 };
+            v.getLocationInWindow(leftTop);
+            int left = leftTop[0];
+            int top = leftTop[1];
+            int bottom = top + v.getHeight();
+            int right = left + v.getWidth();
+            if (event.getX() > left && event.getX() < right
+                    && event.getY() > top && event.getY() < bottom) {
+                return false;
+            } else {
+                return true;
+            }
+        }
+        return false;
+    }
     private void saveSendHistoryRecord() {
         int i;
         SharedPreferences mSharePreferences = getSharedPreferences(
@@ -289,53 +307,12 @@ public class MainActivity extends Activity implements View.OnClickListener {
         return str;
     }
 
-    @Override
-    public void onClick(View v) {
-        InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-        switch (v.getId()) {
-            case R.id.textReceiveRelativeLayout:
-            case R.id.textReceiveScroll:
-            case R.id.textReceive:
-                Log.i(TAG, "textReceiveRelativeLayout");
-
-                if (imm.isActive()) {
-                    Log.e(TAG,"isActive:"+imm.isActive()+",isFullscreenMode:"+imm.isFullscreenMode()+",isAcceptingText:"+imm.isAcceptingText());
-                    imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
-                    //rootLayout.setClickable(false);
-                }
-
-                break;
-            case R.id.traceroute_rootview:
-                Log.e(TAG,"isActive:"+imm.isActive()+",isFullscreenMode:"+imm.isFullscreenMode()+",isAcceptingText:"+imm.isAcceptingText());
-                break;
-
-        }
-
-    }
-
-    /**
-     * ATTENTION: This was auto-generated to implement the App Indexing API.
-     * See https://g.co/AppIndexing/AndroidStudio for more information.
-     */
-    public Action getIndexApiAction() {
-        Thing object = new Thing.Builder()
-                .setName("Main Page") // TODO: Define a title for the content shown.
-                // TODO: Make sure this auto-generated URL is correct.
-                .setUrl(Uri.parse("http://[ENTER-YOUR-URL-HERE]"))
-                .build();
-        return new Action.Builder(Action.TYPE_VIEW)
-                .setObject(object)
-                .setActionStatus(Action.STATUS_TYPE_COMPLETED)
-                .build();
-    }
-
     public class edtFocusChangeListener implements View.OnFocusChangeListener {
 
-        public void onFocusChange(View var1, boolean var2) {
+        public void onFocusChange(View var1, boolean hasFocus) {
             Log.e(TAG, "onFocusChange");
             switch (var1.getId()) {
                 case R.id.editTextSend:
-                    //rootLayout.setClickable(true);
                     break;
             }
 
@@ -356,9 +333,11 @@ public class MainActivity extends Activity implements View.OnClickListener {
                     if (mRxStopFlag == 1) {
                         mRxStopFlag = 0;
                         btnStop.setText("Stop");
+                        btnStop.setTextColor(0xFF00FF00);
                     } else {
                         mRxStopFlag = 1;
                         btnStop.setText("Start");
+                        btnStop.setTextColor(0xFFFF00FF);
                     }
                     break;
                 case R.id.buttonSave:
@@ -457,6 +436,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
                         edtMessage.setEnabled(true);
                         btnSend.setEnabled(true);
                         setTitle(mDevice.getName() + " - Ready");
+
                         //showMessage(mDevice.getName()+ " - ready");
                         mState = UART_PROFILE_CONNECTED;
                     }
@@ -472,7 +452,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
                         mMenuTtemConnect.setTitle("Connect");
                         edtMessage.setEnabled(false);
                         btnSend.setEnabled(false);
-                        setTitle(getPackageName().toString());
+                        setTitle(R.string.app_name);
                         //showMessage("Disconnected to: "+ mDevice.getName());
                         mState = UART_PROFILE_DISCONNECTED;
                         mService.close();
@@ -579,11 +559,6 @@ public class MainActivity extends Activity implements View.OnClickListener {
     @Override
     public void onStart() {
         super.onStart();// ATTENTION: This was auto-generated to implement the App Indexing API.
-// See https://g.co/AppIndexing/AndroidStudio for more information.
-        client.connect();
-        // ATTENTION: This was auto-generated to implement the App Indexing API.
-        // See https://g.co/AppIndexing/AndroidStudio for more information.
-        AppIndex.AppIndexApi.start(client, getIndexApiAction());
     }
 
     @Override
@@ -606,11 +581,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
     protected void onStop() {
         Log.d(TAG, "onStop");
         super.onStop();// ATTENTION: This was auto-generated to implement the App Indexing API.
-// See https://g.co/AppIndexing/AndroidStudio for more information.
-        AppIndex.AppIndexApi.end(client, getIndexApiAction());
-        // ATTENTION: This was auto-generated to implement the App Indexing API.
-        // See https://g.co/AppIndexing/AndroidStudio for more information.
-        client.disconnect();
+
     }
 
     @Override
