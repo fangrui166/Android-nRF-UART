@@ -2,6 +2,8 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="fill_parent"
     android:layout_height="fill_parent"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
     android:orientation="vertical" >
 
     <LinearLayout
@@ -132,6 +134,8 @@
                                     android:layout_width="match_parent"
                                     android:layout_height="match_parent"
                                     android:inputType="textMultiLine"
+                                    android:focusable="true"
+                                    android:focusableInTouchMode="true"
                                     android:ems="10"
                                     android:id="@+id/editTextSend" />
                             </RelativeLayout>

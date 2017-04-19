@@ -29,6 +29,7 @@ package com.nordicsemi.nrfUARTv2;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -62,13 +63,12 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.LinearLayout;
-import android.widget.RelativeLayout;
 import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -77,11 +77,9 @@ import android.widget.Toast;
 public class MainActivity extends Activity {
     private static final int REQUEST_SELECT_DEVICE = 1;
     private static final int REQUEST_ENABLE_BT = 2;
-    private static final int UART_PROFILE_READY = 10;
     public static final String TAG = "nRFUART";
     private static final int UART_PROFILE_CONNECTED = 20;
     private static final int UART_PROFILE_DISCONNECTED = 21;
-    private static final int STATE_OFF = 10;
 
     private static byte tx_tick = 0;
     private static byte rx_tick = 0;
@@ -104,7 +102,6 @@ public class MainActivity extends Activity {
     private List<String> listSendRecord;
     private ArrayAdapter<String> adapterSendRecord;
     private MenuItem mMenuTtemConnect;
-    private InputMethodManager  manager;
     /**
      * ATTENTION: This was auto-generated to implement the App Indexing API.
      * See https://g.co/AppIndexing/AndroidStudio for more information.
@@ -148,8 +145,16 @@ public class MainActivity extends Activity {
 
             public void onItemSelected(AdapterView<?> arg0, View arg1,
                                        int arg2, long arg3) {
-                Log.i(TAG, "onItemSelected:" + arg0 + arg1 + arg2 + arg3);
-                edtMessage.setText("");
+                Log.i(TAG, "onItemSelected");
+                /*
+                try {
+                    Field field = AdapterView.class.getDeclaredField("mOldSelectedPosition");
+                    field.setAccessible(true);
+                    field.setInt(spSendRecord, AdapterView.INVALID_POSITION);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                */
                 edtMessage.setText(arg0.getSelectedItem().toString());
             }
 
@@ -165,7 +170,7 @@ public class MainActivity extends Activity {
                 String message = editText.getText().toString();
                 byte[] value;
                 byte[] tx = new byte[18];
-                ;
+
                 int max_seq;
                 int value_length;
                 int tx_length;
@@ -229,6 +234,7 @@ public class MainActivity extends Activity {
                 InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
                 if (imm != null) {
                     imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
+                    edtMessage.clearFocus();
                 }
             }
             return super.dispatchTouchEvent(ev);
@@ -283,17 +289,23 @@ public class MainActivity extends Activity {
     }
 
     private void SendRecordUpdate(String newItem) {
-        for (int i = 0; i < adapterSendRecord.getCount(); i++) {
+        int i=0;
+        for (i= 0; i < adapterSendRecord.getCount(); i++) {
             if (newItem.equals(adapterSendRecord.getItem(i))) {
                 return;
             }
         }
         if (!newItem.equals("")) {
             adapterSendRecord.add(newItem);
+
         }
-        if (adapterSendRecord.getCount() > 5) {
+        if (adapterSendRecord.getCount() > 10) {
             spSendRecord.setSelection(0);
             adapterSendRecord.remove(spSendRecord.getSelectedItem().toString());
+            spSendRecord.setSelection(i-1);
+        }
+        else{
+            spSendRecord.setSelection(i);
         }
 
     }
@@ -310,9 +322,13 @@ public class MainActivity extends Activity {
     public class edtFocusChangeListener implements View.OnFocusChangeListener {
 
         public void onFocusChange(View var1, boolean hasFocus) {
-            Log.e(TAG, "onFocusChange");
+            Log.e(TAG, "onFocusChange id: "+var1.getId() +" = "+hasFocus);
             switch (var1.getId()) {
                 case R.id.editTextSend:
+                    if(hasFocus){
+                    }
+                    else{
+                    }
                     break;
             }
 
@@ -367,8 +383,11 @@ public class MainActivity extends Activity {
 
                     break;
                 case R.id.buttonSendClear:
+                    Log.e(TAG,"buttonSendClear");
                     edtMessage.setText("");
                     break;
+                case R.id.spinnerSendRecord:
+                    Log.e(TAG,"spinnerSendRecord");
                 default:
                     break;
             }
@@ -493,6 +512,7 @@ public class MainActivity extends Activity {
                             rx_tick = value[3];
                             rx_pkt_num++;
                             if (rx_pkt_num == max_seq){
+                                //Log.i(TAG, "rx_received , rx_pkt_num:"+rx_pkt_num);
                                 rx_received = true;
                             }
                         } else {
@@ -509,7 +529,8 @@ public class MainActivity extends Activity {
 
                         try {
                             if (rx_received) {
-                                String text = new String(rx, "UTF-8").trim();
+                                //String text = new String(rx,"UTF-8").trim();
+                                String text = new String(rx,"UTF-8").replace("\0", "");
                                 //String currentDateTimeString = DateFormat.getTimeInstance().format(new Date());
                                 //listAdapter.add("["+currentDateTimeString+"] RX: "+text);
                                 data2Display(text);
@@ -535,6 +556,7 @@ public class MainActivity extends Activity {
         if (mRxStopFlag == 0) {
             StringBuilder sMsg = new StringBuilder();
             sMsg.append(str);
+            //Log.i(TAG,"data2Display");
             textViewReciver.append(sMsg);
             scrollViewRecviver.fullScroll(ScrollView.FOCUS_DOWN);
         }
@@ -714,4 +736,6 @@ public class MainActivity extends Activity {
         mMenuTtemConnect = menu.findItem(R.id.connect);
         return true;
     }
+
+
 }
